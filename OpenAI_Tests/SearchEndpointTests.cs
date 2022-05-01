@@ -1,5 +1,6 @@
 ﻿using NUnit.Framework;
 using OpenAI_API;
+using OpenAI_API.Data;
 using System;
 using System.IO;
 using System.Linq;
@@ -17,16 +18,39 @@ namespace OpenAI_Tests
 		[Test]
 		public void TestBasicSearch()
 		{
-			var api = new OpenAI_API.OpenAIAPI(engine: Engine.Curie);
+			var key = Environment.GetEnvironmentVariable("TEST_OPENAI_SECRET_KEY");
+			var auth = new OpenAI_API.APIAuthentication(key);			
+			var api = new OpenAI_API.OpenAIAPI(auth, engine: Engine.Curie);
 
 			Assert.IsNotNull(api.Search);
 
-			var result = api.Search.GetBestMatchAsync("Washington DC", "Canada", "China", "USA", "Spain").Result;
+			var result = api.Search.GetBestMatchAsync("Washington DC"
+				, "Canada"
+				, "China"
+				, "USA"
+				, "Spain").Result;
 			Assert.IsNotNull(result);
 			Assert.AreEqual("USA", result);
 		}
+		[Test]
+		public void TestFileSearch()
+		{
+			var key = Environment.GetEnvironmentVariable("TEST_OPENAI_SECRET_KEY");
+			var auth = new OpenAI_API.APIAuthentication(key);
+			var api = new OpenAI_API.OpenAIAPI(auth, engine: Engine.Curie);
 
-		// TODO: More tests needed but this covers basic functionality at least
-
+			Assert.IsNotNull(api.Search);
+			SearchRequest sr = new SearchRequest
+			{
+				File = "file-YuUF8p1BtnYJw0E3JBrSWXf6",
+				Query = "We will at all times maintain a documented data governance and protection procedure.",
+				MaxRerank = 5,
+				ReturnMetaData = true
+			};
+			var result = api.Search.GetSearchResultsAsync(sr).Result;
+			Assert.IsNotNull(result);
+			var topScoreMetaData = result.Results.OrderByDescending(a => a.Score).First().MetaData;
+			Assert.AreEqual("Information Security Management Program", topScoreMetaData);
+		}
 	}
 }

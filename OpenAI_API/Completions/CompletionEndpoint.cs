@@ -1,4 +1,4 @@
-﻿using Newtonsoft.Json;
+﻿using System.Text.Json.Serialization;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -8,6 +8,8 @@ using System.Runtime.CompilerServices;
 using System.Security.Authentication;
 using System.Text;
 using System.Threading.Tasks;
+using System.Text.Json;
+using RestSharp;
 
 namespace OpenAI_API
 {
@@ -46,24 +48,23 @@ namespace OpenAI_API
 			}
 
 			request.Stream = false;
-			HttpClient client = new HttpClient();
-			client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", Api.Auth.ApiKey);
-			client.DefaultRequestHeaders.Add("User-Agent", "okgodoit/dotnet_openai_api");
+			
+			var webRequest = new RestRequest($"v1/engines/{Api.UsingEngine.EngineName}/completions", Method.Post);
 
-			string jsonContent = JsonConvert.SerializeObject(request, new JsonSerializerSettings() { NullValueHandling = NullValueHandling.Ignore });
-			var stringContent = new StringContent(jsonContent, UnicodeEncoding.UTF8, "application/json");
-
-			var response = await client.PostAsync($"https://api.openai.com/v1/engines/{Api.UsingEngine.EngineName}/completions", stringContent);
-			if (response.IsSuccessStatusCode)
+			string jsonContent = JsonSerializer.Serialize(request, new JsonSerializerOptions());			
+			webRequest.AddBody(jsonContent, "application/json");
+			webRequest.AddHeader("Authorization", $"Bearer {Api.Auth.ApiKey}");
+			var response = await Api.Client.ExecuteAsync(webRequest);
+			if (response.IsSuccessful)
 			{
-				string resultAsString = await response.Content.ReadAsStringAsync();
+				string resultAsString = response.Content;
 
-				var res = JsonConvert.DeserializeObject<CompletionResult>(resultAsString);
+				var res = JsonSerializer.Deserialize<CompletionResult>(resultAsString);
 				try
 				{
-					res.Organization = response.Headers.GetValues("Openai-Organization").FirstOrDefault();
-					res.RequestId = response.Headers.GetValues("X-Request-ID").FirstOrDefault();
-					res.ProcessingTime = TimeSpan.FromMilliseconds(int.Parse(response.Headers.GetValues("Openai-Processing-Ms").First()));
+					res.Organization = response.Headers.FirstOrDefault(a => a.Name.ToLower() == "openai-organization").Value.ToString();
+					res.RequestId = response.Headers.FirstOrDefault(a => a.Name.ToLower() == "x-request-id").Value.ToString();
+					res.ProcessingTime = new TimeSpan(Convert.ToInt64(response.Headers.FirstOrDefault(a => a.Name.ToLower() == "openai-processing-ms").Value));
 				}
 				catch (Exception) { }
 
@@ -145,6 +146,7 @@ namespace OpenAI_API
 			return CreateCompletionAsync(request);
 		}
 
+		
 		#endregion
 
 		#region Streaming
@@ -165,7 +167,7 @@ namespace OpenAI_API
 			request = new CompletionRequest(request) { Stream = true };
 			HttpClient client = new HttpClient();
 
-			string jsonContent = JsonConvert.SerializeObject(request, new JsonSerializerSettings() { NullValueHandling = NullValueHandling.Ignore });
+			string jsonContent = JsonSerializer.Serialize(request, new JsonSerializerOptions());
 			var stringContent = new StringContent(jsonContent, UnicodeEncoding.UTF8, "application/json");
 
 			using (HttpRequestMessage req = new HttpRequestMessage(HttpMethod.Post, $"https://api.openai.com/v1/engines/{Api.UsingEngine.EngineName}/completions"))
@@ -195,7 +197,7 @@ namespace OpenAI_API
 							else if (!string.IsNullOrWhiteSpace(line))
 							{
 								index++;
-								var res = JsonConvert.DeserializeObject<CompletionResult>(line.Trim());
+								var res = JsonSerializer.Deserialize<CompletionResult>(line.Trim());
 								try
 								{
 									res.Organization = response.Headers.GetValues("Openai-Organization").FirstOrDefault();
@@ -243,7 +245,7 @@ namespace OpenAI_API
 			request = new CompletionRequest(request) { Stream = true };
 			HttpClient client = new HttpClient();
 
-			string jsonContent = JsonConvert.SerializeObject(request, new JsonSerializerSettings() { NullValueHandling = NullValueHandling.Ignore });
+			string jsonContent = JsonSerializer.Serialize(request, new JsonSerializerOptions());
 			var stringContent = new StringContent(jsonContent, UnicodeEncoding.UTF8, "application/json");
 
 			using (HttpRequestMessage req = new HttpRequestMessage(HttpMethod.Post, $"https://api.openai.com/v1/engines/{Api.UsingEngine.EngineName}/completions"))
@@ -270,7 +272,7 @@ namespace OpenAI_API
 							}
 							else if (!string.IsNullOrWhiteSpace(line))
 							{
-								var res = JsonConvert.DeserializeObject<CompletionResult>(line.Trim());
+								var res = JsonSerializer.Deserialize<CompletionResult>(line.Trim());
 								yield return res;
 							}
 						}

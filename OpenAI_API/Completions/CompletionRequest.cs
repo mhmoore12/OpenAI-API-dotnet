@@ -1,4 +1,4 @@
-﻿using Newtonsoft.Json;
+﻿using System.Text.Json.Serialization;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -15,7 +15,7 @@ namespace OpenAI_API
 		/// <summary>
 		/// This is only used for serializing the request into JSON, do not use it directly.
 		/// </summary>
-		[JsonProperty("prompt")]
+		[JsonPropertyName("prompt")]
 		public object CompiledPrompt
 		{
 			get
@@ -49,62 +49,62 @@ namespace OpenAI_API
 		/// <summary>
 		/// How many tokens to complete to. Can return fewer if a stop sequence is hit.
 		/// </summary>
-		[JsonProperty("max_tokens")]
+		[JsonPropertyName("max_tokens")]
 		public int? MaxTokens { get; set; }
 
 		/// <summary>
 		/// What sampling temperature to use. Higher values means the model will take more risks. Try 0.9 for more creative applications, and 0 (argmax sampling) for ones with a well-defined answer. It is generally recommend to use this or <see cref="TopP"/> but not both.
 		/// </summary>
-		[JsonProperty("temperature")]
+		[JsonPropertyName("temperature")]
 		public double? Temperature { get; set; }
 
 		/// <summary>
 		/// An alternative to sampling with temperature, called nucleus sampling, where the model considers the results of the tokens with top_p probability mass. So 0.1 means only the tokens comprising the top 10% probability mass are considered. It is generally recommend to use this or <see cref="Temperature"/> but not both.
 		/// </summary>
-		[JsonProperty("top_p")]
+		[JsonPropertyName("top_p")]
 		public double? TopP { get; set; }
 
 		/// <summary>
 		/// The scale of the penalty applied if a token is already present at all.  Should generally be between 0 and 1, although negative numbers are allowed to encourage token reuse.
 		/// </summary>
-		[JsonProperty("presence_penalty")]
-		public double? PresencePenalty { get; set; }
+		[JsonPropertyName("presence_penalty")]
+		public double? PresencePenalty { get; set; } = 0;
 
 
 		/// <summary>
 		/// The scale of the penalty for how often a token is used.  Should generally be between 0 and 1, although negative numbers are allowed to encourage token reuse.
 		/// </summary>
-		[JsonProperty("frequency_penalty")]
-		public double? FrequencyPenalty { get; set; }
+		[JsonPropertyName("frequency_penalty")]
+		public double? FrequencyPenalty { get; set; } = 0;
 
 		/// <summary>
 		/// How many different choices to request for each prompt.
 		/// </summary>
-		[JsonProperty("n")]
+		[JsonPropertyName("n")]
 		public int? NumChoicesPerPrompt { get; set; }
 
 		/// <summary>
 		/// Specifies where the results should stream and be returned at one time.  Do not set this yourself, use the appropriate methods on <see cref="CompletionEndpoint"/> instead.
 		/// </summary>
-		[JsonProperty("stream")]
+		[JsonPropertyName("stream")]
 		public bool Stream { get; internal set; } = false;
 
 		/// <summary>
 		/// Include the log probabilities on the logprobs most likely tokens, which can be found in <see cref="CompletionResult.Choices"/> -> <see cref="Choice.Logprobs"/>. So for example, if logprobs is 10, the API will return a list of the 10 most likely tokens. If logprobs is supplied, the API will always return the logprob of the sampled token, so there may be up to logprobs+1 elements in the response.
 		/// </summary>
-		[JsonProperty("logprobs")]
+		[JsonPropertyName("logprobs")]
 		public int? Logprobs { get; set; }
 
 		/// <summary>
 		/// Echo back the prompt in addition to the completion
 		/// </summary>
-		[JsonProperty("echo")]
+		[JsonPropertyName("echo")]
 		public bool? Echo { get; set; }
 
 		/// <summary>
 		/// This is only used for serializing the request into JSON, do not use it directly.
 		/// </summary>
-		[JsonProperty("stop")]
+		[JsonPropertyName("stop")]
 		public object CompiledStop
 		{
 			get
@@ -144,7 +144,8 @@ namespace OpenAI_API
 		/// </summary>
 		public CompletionRequest()
 		{
-
+			PresencePenalty = 0;
+			FrequencyPenalty = 0;
 		}
 
 		/// <summary>
@@ -192,8 +193,8 @@ namespace OpenAI_API
 			double? temperature = null,
 			double? top_p = null,
 			int? numOutputs = null,
-			double? presencePenalty = null,
-			double? frequencyPenalty = null,
+			double? presencePenalty = 0,
+			double? frequencyPenalty = 0,
 			int? logProbs = null,
 			bool? echo = null,
 			params string[] stopSequences)

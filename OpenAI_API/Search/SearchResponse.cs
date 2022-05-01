@@ -1,4 +1,4 @@
-﻿using Newtonsoft.Json;
+﻿using System.Text.Json.Serialization;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -13,14 +13,20 @@ namespace OpenAI_API
 		/// <summary>
 		/// The index of the document as originally supplied
 		/// </summary>
-		[JsonProperty("document")]
+		[JsonPropertyName("document")]
 		public int DocumentIndex { get; set; }
 
 		/// <summary>
 		/// The relative score of this document
 		/// </summary>
-		[JsonProperty("score")]
+		[JsonPropertyName("score")]
 		public double Score { get; set; }
+		[JsonPropertyName("text")]
+		public string Text { get; set; }
+		[JsonPropertyName("object")]
+		public string Object { get; set; }
+		[JsonPropertyName("metadata")]
+		public string MetaData { get; set; }
 
 	}
 
@@ -32,7 +38,7 @@ namespace OpenAI_API
 		/// <summary>
 		/// The list of results
 		/// </summary>
-		[JsonProperty("data")]
+		[JsonPropertyName("data")]
 		public List<SearchResult> Results { get; set; }
 
 		/// <summary>

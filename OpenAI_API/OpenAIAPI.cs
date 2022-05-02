@@ -1,4 +1,4 @@
-﻿using Newtonsoft.Json;
+﻿using System.Text.Json.Serialization;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -6,6 +6,8 @@ using System.Linq;
 using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
+using OpenAI_API.Files;
+using RestSharp;
 
 namespace OpenAI_API
 {
@@ -36,6 +38,8 @@ namespace OpenAI_API
 			Completions = new CompletionEndpoint(this);
 			Engines = new EnginesEndpoint(this);
 			Search = new SearchEndpoint(this);
+			Files = new FilesEndpoint(this);
+			Client = new RestClient("https://api.openai.com/");
 		}
 
 		/// <summary>
@@ -52,10 +56,10 @@ namespace OpenAI_API
 		/// The API lets you do semantic search over documents. This means that you can provide a query, such as a natural language question or a statement, and find documents that answer the question or are semantically related to the statement. The “documents” can be words, sentences, paragraphs or even longer documents. For example, if you provide documents "White House", "hospital", "school" and query "the president", you’ll get a different similarity score for each document. The higher the similarity score, the more semantically similar the document is to the query (in this example, “White House” will be most similar to “the president”).
 		/// </summary>
 		public SearchEndpoint Search { get; }
-
-
-
-
-
-	}
+		/// <summary>
+		/// Files are used to upload documents that can be used across features like Answers, Search, and Classifications
+		/// </summary>
+		public FilesEndpoint Files { get; }
+        public RestClient Client { get; }
+    }
 }

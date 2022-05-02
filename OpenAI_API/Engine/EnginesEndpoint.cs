@@ -1,4 +1,4 @@
-﻿using Newtonsoft.Json;
+﻿using System.Text.Json.Serialization;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -7,6 +7,7 @@ using System.Runtime.CompilerServices;
 using System.Security.Authentication;
 using System.Text;
 using System.Threading.Tasks;
+using System.Text.Json;
 
 namespace OpenAI_API
 {
@@ -61,7 +62,7 @@ namespace OpenAI_API
 
 			if (response.IsSuccessStatusCode)
 			{
-				var engines = JsonConvert.DeserializeObject<JsonHelperRoot>(resultAsString).data;
+				var engines = JsonSerializer.Deserialize<JsonHelperRoot>(resultAsString).data;
 				return engines;
 			}
 			else
@@ -91,7 +92,7 @@ namespace OpenAI_API
 			if (response.IsSuccessStatusCode)
 			{
 				string resultAsString = await response.Content.ReadAsStringAsync();
-				var engine = JsonConvert.DeserializeObject<Engine>(resultAsString);
+				var engine = JsonSerializer.Deserialize<Engine>(resultAsString);
 				return engine;
 			}
 			else
@@ -105,9 +106,9 @@ namespace OpenAI_API
 		/// </summary>
 		private class JsonHelperRoot
 		{
-			[JsonProperty("data")]
+			[JsonPropertyName("data")]
 			public List<Engine> data { get; set; }
-			[JsonProperty("object")]
+			[JsonPropertyName("object")]
 			public string obj { get; set; }
 
 		}

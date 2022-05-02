@@ -1,4 +1,4 @@
-﻿using Newtonsoft.Json;
+﻿using System.Text.Json.Serialization;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -6,6 +6,9 @@ using System.Net.Http;
 using System.Security.Authentication;
 using System.Text;
 using System.Threading.Tasks;
+using System.Text.Json;
+using RestSharp;
+using OpenAI_API.Data;
 
 namespace OpenAI_API
 {
@@ -33,56 +36,45 @@ namespace OpenAI_API
 		/// </summary>
 		/// <param name="request">The request containing the query and the documents to match against</param>
 		/// <returns>Asynchronously returns a Dictionary mapping each document to the score for that document.  The similarity score is a positive score that usually ranges from 0 to 300 (but can sometimes go higher), where a score above 200 usually means the document is semantically similar to the query.</returns>
-		public async Task<Dictionary<string, double>> GetSearchResultsAsync(SearchRequest request)
+		public async Task<SearchResponse> GetSearchResultsAsync(SearchRequest request)
 		{
 			if (Api.Auth?.ApiKey is null)
 			{
 				throw new AuthenticationException("You must provide API authentication.  Please refer to https://github.com/OkGoDoIt/OpenAI-API-dotnet#authentication for details.");
 			}
+			var webRequest = new RestRequest($"v1/engines/{Api.UsingEngine.EngineName}/search", Method.Post);			
+			var body = JsonSerializer.Serialize(request).Replace("\"documents\":[],","");
+			webRequest.AddBody(body, "application/json");
+			webRequest.AddHeader("Authorization", $"Bearer {Api.Auth.ApiKey}");			
 
-			HttpClient client = new HttpClient();
-			client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", Api.Auth.ApiKey);
-			client.DefaultRequestHeaders.Add("User-Agent", "okgodoit/dotnet_openai_api");
 
-			string jsonContent = JsonConvert.SerializeObject(request, new JsonSerializerSettings() { NullValueHandling = NullValueHandling.Ignore, MissingMemberHandling = MissingMemberHandling.Ignore });
-			var stringContent = new StringContent(jsonContent, UnicodeEncoding.UTF8, "application/json");
+			var response = await Api.Client.ExecuteAsync(webRequest);						
 
-			var response = await client.PostAsync($"https://api.openai.com/v1/engines/{Api.UsingEngine.EngineName}/search", stringContent);
-			if (response.IsSuccessStatusCode)
+			if (response.IsSuccessful)
 			{
-				string resultAsString = await response.Content.ReadAsStringAsync();
-				var res = JsonConvert.DeserializeObject<SearchResponse>(resultAsString);
+				string resultAsString = response.Content;
+				var res = JsonSerializer.Deserialize<SearchResponse>(resultAsString);
 
 				try
 				{
-					res.Organization = response.Headers.GetValues("Openai-Organization").FirstOrDefault();
-					res.RequestId = response.Headers.GetValues("X-Request-ID").FirstOrDefault();
-					res.ProcessingTime = TimeSpan.FromMilliseconds(int.Parse(response.Headers.GetValues("Openai-Processing-Ms").First()));
+					res.Organization = response.Headers.FirstOrDefault(a => a.Name.ToLower() == "openai-organization").Value.ToString();
+					res.RequestId = response.Headers.FirstOrDefault(a => a.Name.ToLower() == "x-request-id").Value.ToString();
+					res.ProcessingTime = new TimeSpan(Convert.ToInt64(response.Headers.FirstOrDefault(a => a.Name.ToLower() == "openai-processing-ms").Value));
 				}
 				catch (Exception) { }
 
 				if (res.Results == null || res.Results.Count == 0)
 					throw new HttpRequestException("API returnes no search results.  HTTP status code: " + response.StatusCode.ToString() + ". Response body: " + resultAsString);
 
-				return res.Results.ToDictionary(r => request.Documents[r.DocumentIndex], r => r.Score);
+				return res;
 			}
 			else
 			{
-				throw new HttpRequestException("Error calling OpenAi API to get completion.  HTTP status code: " + response.StatusCode.ToString() + ". Request body: " + jsonContent);
+				throw new HttpRequestException("Error calling OpenAi API to get search results.  HTTP status code: " + response.StatusCode.ToString());
 			}
 		}
 
-		/// <summary>
-		/// Perform a semantic search over a list of documents, with a specific query
-		/// </summary>
-		/// <param name="request">The request containing the documents to match against</param>
-		/// <param name="query">A query to search for, overriding whatever was provided in <paramref name="request"/></param>
-		/// <returns>Asynchronously returns a Dictionary mapping each document to the score for that document.  The similarity score is a positive score that usually ranges from 0 to 300 (but can sometimes go higher), where a score above 200 usually means the document is semantically similar to the query.</returns>
-		public Task<Dictionary<string, double>> GetSearchResultsAsync(SearchRequest request, string query)
-		{
-			request.Query = query;
-			return GetSearchResultsAsync(request);
-		}
+
 
 		/// <summary>
 		/// Perform a semantic search of a query over a list of documents
@@ -90,7 +82,7 @@ namespace OpenAI_API
 		/// <param name="query">A query to match against</param>
 		/// <param name="documents">Documents to search over, provided as a list of strings</param>
 		/// <returns>Asynchronously returns a Dictionary mapping each document to the score for that document.  The similarity score is a positive score that usually ranges from 0 to 300 (but can sometimes go higher), where a score above 200 usually means the document is semantically similar to the query.</returns>
-		public Task<Dictionary<string, double>> GetSearchResultsAsync(string query, params string[] documents)
+		public Task<SearchResponse> GetSearchResultsAsync(string query, params string[] documents)
 		{
 			SearchRequest request = new SearchRequest(query, documents);
 			return GetSearchResultsAsync(request);
@@ -108,10 +100,18 @@ namespace OpenAI_API
 		public async Task<string> GetBestMatchAsync(SearchRequest request)
 		{
 			var results = await GetSearchResultsAsync(request);
-			if (results.Count == 0)
+			if (results.Results.Count == 0)
 				return null;
-
-			return results.ToList().OrderByDescending(kv => kv.Value).FirstOrDefault().Key;
+			var best = results.Results.OrderByDescending(kv => kv.Score).FirstOrDefault();
+			if (request.Documents == null || request.Documents.Count == 0)
+			{
+				return best?.MetaData ?? best?.Text;
+			}
+            else
+            {
+				var docIndex = best.DocumentIndex;
+				return request.Documents[docIndex];
+            }
 		}
 
 		/// <summary>
@@ -147,11 +147,11 @@ namespace OpenAI_API
 		/// </summary>
 		/// <param name="request">The request containing the query and the documents to match against</param>
 		/// <returns>Asynchronously returns a tuple of the best matching document and its score.  The similarity score is a positive score that usually ranges from 0 to 300 (but can sometimes go higher), where a score above 200 usually means the document is semantically similar to the query.</returns>
-		public async Task<Tuple<string, double>> GetBestMatchWithScoreAsync(SearchRequest request)
+		public async Task<SearchResult> GetBestMatchWithScoreAsync(SearchRequest request)
 		{
 			var results = await GetSearchResultsAsync(request);
-			var best = results.ToList().OrderByDescending(kv => kv.Value).FirstOrDefault();
-			return new Tuple<string, double>(best.Key, best.Value);
+			var best = results.Results.OrderByDescending(kv => kv.Score).FirstOrDefault();
+			return best;
 		}
 
 		/// <summary>
@@ -160,7 +160,7 @@ namespace OpenAI_API
 		/// <param name="request">The request containing the documents to match against</param>
 		/// <param name="query">A query to search for, overriding whatever was provided in <paramref name="request"/></param>
 		/// <returns>Asynchronously returns a tuple of the best matching document and its score.  The similarity score is a positive score that usually ranges from 0 to 300 (but can sometimes go higher), where a score above 200 usually means the document is semantically similar to the query.</returns>
-		public Task<Tuple<string, double>> GetBestMatchWithScoreAsync(SearchRequest request, string query)
+		public Task<SearchResult> GetBestMatchWithScoreAsync(SearchRequest request, string query)
 		{
 			request.Query = query;
 			return GetBestMatchWithScoreAsync(request);
@@ -172,7 +172,7 @@ namespace OpenAI_API
 		/// <param name="query">A query to match against</param>
 		/// <param name="documents">Documents to search over, provided as a list of strings</param>
 		/// <returns>Asynchronously returns a tuple of the best matching document and its score.  The similarity score is a positive score that usually ranges from 0 to 300 (but can sometimes go higher), where a score above 200 usually means the document is semantically similar to the query.</returns>
-		public Task<Tuple<string, double>> GetBestMatchWithScoreAsync(string query, params string[] documents)
+		public Task<SearchResult> GetBestMatchWithScoreAsync(string query, params string[] documents)
 		{
 			SearchRequest request = new SearchRequest(query, documents);
 			return GetBestMatchWithScoreAsync(request);

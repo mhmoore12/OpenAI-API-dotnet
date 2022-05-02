@@ -10,8 +10,7 @@ namespace OpenAI_Tests
 		public void Setup()
 		{
 			File.WriteAllText(".openai", "OPENAI_KEY=pk-test12");
-			Environment.SetEnvironmentVariable("OPENAI_KEY", "pk-test-env");
-			Environment.SetEnvironmentVariable("OPENAI_SECRET_KEY", "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 ");
+			Environment.SetEnvironmentVariable("OPENAI_KEY", "pk-test-env");			
 		}
 
 		[Test]
